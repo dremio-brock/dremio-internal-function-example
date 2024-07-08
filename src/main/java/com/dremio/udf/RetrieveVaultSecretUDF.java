@@ -29,7 +29,6 @@ import com.dremio.exec.expr.fn.impl.StringFunctionHelpers;
 import io.github.jopenlibs.vault.Vault;
 import io.github.jopenlibs.vault.VaultConfig;
 import io.github.jopenlibs.vault.VaultException;
-import io.github.jopenlibs.vault.response.LogicalResponse;
 
 import org.apache.arrow.memory.ArrowBuf;
 
@@ -61,8 +60,8 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
 
   @Override
   public void eval() {
-    String result = "";
 
+    String result;
     try {
       // Get the input values
       String vaultAddressStr = StringFunctionHelpers.getStringFromVarCharHolder(vaultAddress);
@@ -79,7 +78,7 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
       Vault vault = Vault.create(config);
 
       // Read the secret from Vault
-      result = " " + vault.logical().read(secretPathStr).getData().toString();
+      result = vault.logical().read(secretPathStr).getData().get(keyStr);
     } catch (VaultException e) {
       result = "Error: " + e.getMessage();
     }
