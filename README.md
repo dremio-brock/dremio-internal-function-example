@@ -1,4 +1,4 @@
-# Simple Example Dremio Internal Functions
+# Dremio UDF for retrieving Hashicorp secrect values
 
 [![Build Status](https://travis-ci.org/dremio-hub/dremio-internal-function-example.svg?branch=master)](https://travis-ci.org/dremio-hub/dremio-internal-function-example)
 
