@@ -33,6 +33,7 @@ import io.github.jopenlibs.vault.VaultException;
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ConcurrentHashMap;
 
 @FunctionTemplate(
     name = "retrieve_hashicorp_secret",
@@ -51,8 +52,12 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
   VarCharHolder secretPath;
   @Param
   VarCharHolder key;
+  @Param
+  VarCharHolder invalidateCache;
   @Output
   VarCharHolder out;
+
+  private static final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
 
   @Override
   public void setup() {
@@ -68,22 +73,37 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
       String tokenStr = StringFunctionHelpers.getStringFromVarCharHolder(token);
       String secretPathStr = StringFunctionHelpers.getStringFromVarCharHolder(secretPath);
       String keyStr = StringFunctionHelpers.getStringFromVarCharHolder(key);
+      String invalidateCacheStr = StringFunctionHelpers.getStringFromVarCharHolder(invalidateCache);
 
-      // Set up the Vault configuration
-      VaultConfig config = new VaultConfig()
-              .address(vaultAddressStr)
-              .token(tokenStr)
-              .build();
+      // Create a cache key
+      String cacheKey = vaultAddressStr + "|" + secretPathStr + "|" + keyStr;
 
-      Vault vault = Vault.create(config);
+      // Invalidate the cache if requested
+      if ("true".equalsIgnoreCase(invalidateCacheStr)) {
+        cache.remove(cacheKey);
+      }
 
-      // Read the secret from Vault
-      result = vault.logical().read(secretPathStr).getData().get(keyStr);
+      // Check if the value is already in the cache
+      result = cache.get(cacheKey);
+      if (result == null) {
+        // Set up the Vault configuration
+        VaultConfig config = new VaultConfig()
+                .address(vaultAddressStr)
+                .token(tokenStr)
+                .build();
+
+        Vault vault = Vault.create(config);
+
+        // Read the secret from Vault
+        result = vault.logical().read(secretPathStr).getData().get(keyStr);
+
+        // Store the result in the cache
+        cache.put(cacheKey, result);
+      }
     } catch (VaultException e) {
       result = "Error: " + e.getMessage();
     }
 
-    System.out.println("Input value: " + result);
     byte[] resultBytes = result.getBytes(StandardCharsets.UTF_8);
     buffer.setBytes(0, resultBytes);
 
