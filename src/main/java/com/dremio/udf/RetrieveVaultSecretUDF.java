@@ -1,18 +1,3 @@
-/*
- * Copyright (C) 2017-2018 Dremio Corporation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.dremio.udf;
 
 import javax.inject.Inject;
@@ -33,12 +18,11 @@ import io.github.jopenlibs.vault.VaultException;
 import org.apache.arrow.memory.ArrowBuf;
 
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ConcurrentHashMap;
 
 @FunctionTemplate(
-    name = "retrieve_hashicorp_secret",
-    nulls = NullHandling.NULL_IF_NULL)
-
+        name = "retrieve_hashicorp_secret",
+        nulls = NullHandling.NULL_IF_NULL
+)
 public class RetrieveVaultSecretUDF implements SimpleFunction {
 
   @Inject
@@ -57,16 +41,13 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
   @Output
   VarCharHolder out;
 
-  private static final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
-
   @Override
   public void setup() {
   }
 
   @Override
   public void eval() {
-
-    String result;
+    String result = "";
     try {
       // Get the input values
       String vaultAddressStr = StringFunctionHelpers.getStringFromVarCharHolder(vaultAddress);
@@ -80,11 +61,11 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
 
       // Invalidate the cache if requested
       if ("true".equalsIgnoreCase(invalidateCacheStr)) {
-        cache.remove(cacheKey);
+        VaultCacheManager.invalidateCache(cacheKey);
       }
 
       // Check if the value is already in the cache
-      result = cache.get(cacheKey);
+      result = VaultCacheManager.getFromCache(cacheKey);
       if (result == null) {
         // Set up the Vault configuration
         VaultConfig config = new VaultConfig()
@@ -98,7 +79,7 @@ public class RetrieveVaultSecretUDF implements SimpleFunction {
         result = vault.logical().read(secretPathStr).getData().get(keyStr);
 
         // Store the result in the cache
-        cache.put(cacheKey, result);
+        VaultCacheManager.putInCache(cacheKey, result);
       }
     } catch (VaultException e) {
       result = "Error: " + e.getMessage();
